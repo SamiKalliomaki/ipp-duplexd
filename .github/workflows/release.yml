@@ -1,0 +1,93 @@
+name: Release
+
+# Build the Arch and Debian packages with the same scripts used locally and
+# attach them to a GitHub release for the pushed tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    name: check tag matches Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare versions
+        run: |
+          ver=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          echo "Cargo.toml: $ver  ref: $GITHUB_REF_NAME"
+          if [[ "$GITHUB_REF_NAME" == v* && "$GITHUB_REF_NAME" != "v$ver" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $ver" >&2
+            exit 1
+          fi
+
+  deb:
+    name: Debian package
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build .deb
+        run: ./packaging/build-deb.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: packaging/*.deb
+          if-no-files-found: error
+
+  arch:
+    name: Arch package
+    needs: version
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install build dependencies
+        run: pacman -Syu --noconfirm --needed rust qpdf git
+
+      - uses: actions/checkout@v4
+
+      # makepkg refuses to run as root, and the container's default user is root
+      - name: Build package as unprivileged user
+        run: |
+          useradd -m builder
+          chown -R builder: .
+          su builder -c ./packaging/build-arch.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch
+          # not the auto-generated ipp-duplexd-debug split package
+          path: |
+            packaging/arch/ipp-duplexd-*.pkg.tar.zst
+            !packaging/arch/ipp-duplexd-debug-*.pkg.tar.zst
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: [deb, arch]
+    # workflow_dispatch runs stop after the build artifacts; only tags release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ipp-duplexd $GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*
