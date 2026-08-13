@@ -1,0 +1,11 @@
+# Configuration for the ipp-duplexd user service.
+# Copy to ~/.config/ipp-duplexd.conf and adjust, then:
+#   systemctl --user enable --now ipp-duplexd
+#
+# Point --printer at the real printer's ipp:// endpoint; a local CUPS
+# queue is best (CUPS keeps doing driver/TLS work):
+IPP_DUPLEXD_ARGS=--printer ipp://127.0.0.1:631/printers/laser
+# More options: --listen 127.0.0.1:6632 --name manual-duplex
+#   --blank leading|trailing|none --auto-continue N --rotate-even 180|0
+# A flip-confirmation dialog opens by default (zenity/kdialog/xmessage);
+# with --no-gui (or no dialog tool), confirm with:  curl http://127.0.0.1:6632/flip

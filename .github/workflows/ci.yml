@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: build, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The daemon shells out to qpdf, and the e2e suite uses it to inspect
+      # the PDFs the mock printer receives.
+      - name: Install qpdf and shellcheck
+        run: sudo apt-get update && sudo apt-get install -y qpdf shellcheck
+
+      - name: Show toolchain
+        run: rustc --version && cargo --version
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # PKGBUILD is not checked: it relies on makepkg-provided variables and
+      # functions that shellcheck cannot know about.
+      - name: Shellcheck
+        run: shellcheck packaging/*.sh
+
+      - name: Build
+        run: cargo build --all-targets
+
+      - name: Test
+        run: cargo test

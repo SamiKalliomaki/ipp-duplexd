@@ -1,0 +1,13 @@
+[package]
+name = "ipp-duplexd"
+version = "0.1.1"
+edition = "2021"
+authors = ["Sami Kalliomäki <sami@kalliomaki.me>"]
+description = "Loopback IPP printer that performs manual duplex on a real IPP printer"
+license = "MIT"
+repository = "https://github.com/SamiKalliomaki/ipp-duplexd"
+
+[dependencies]
+
+[profile.release]
+strip = true

@@ -1,0 +1,8 @@
+/target/
+
+# package build outputs
+/packaging/*.deb
+/packaging/arch/*.pkg.tar.zst
+/packaging/arch/*.tar.gz
+/packaging/arch/src/
+/packaging/arch/pkg/

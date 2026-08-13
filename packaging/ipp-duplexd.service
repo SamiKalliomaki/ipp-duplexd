@@ -1,0 +1,15 @@
+[Unit]
+Description=Manual duplex virtual IPP printer
+Documentation=file:/usr/share/doc/ipp-duplexd/README.md
+After=network.target
+
+[Service]
+# Put e.g.  IPP_DUPLEXD_ARGS=--printer ipp://127.0.0.1:631/printers/laser
+# into ~/.config/ipp-duplexd.conf (see ipp-duplexd.conf.example).
+EnvironmentFile=%h/.config/ipp-duplexd.conf
+ExecStart=/usr/bin/ipp-duplexd $IPP_DUPLEXD_ARGS
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

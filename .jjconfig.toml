@@ -1,0 +1,18 @@
+# Shared jj settings for this repo. jj never loads tracked files on its own,
+# so either use them ad hoc:
+#
+#     jj --config-file .jjconfig.toml fix
+#
+# or append it to your repo config once, after which plain `jj fix` works:
+#
+#     JJ_EDITOR='tee -a' jj config edit --repo < .jjconfig.toml
+
+# `jj fix` reformats Rust files with rustfmt. The edition is passed
+# explicitly because rustfmt reading a file on stdin never sees Cargo.toml.
+[fix.tools.rustfmt]
+command = ["rustfmt", "--emit", "stdout", "--edition", "2021"]
+patterns = ["glob:**/*.rs"]
+
+# Fix every mutable commit reachable from the working copy, not just @.
+[revsets]
+fix = "reachable(@, mutable())"

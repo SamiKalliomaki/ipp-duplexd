@@ -1,0 +1,28 @@
+# Maintainer: Sami Kalliomäki <sami@kalliomaki.me>
+pkgname=ipp-duplexd
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Manual duplex printing via a loopback virtual IPP printer"
+arch=('x86_64' 'aarch64')
+license=('MIT')
+depends=('qpdf' 'gcc-libs')
+makedepends=('cargo')
+# The tarball is produced from the working tree by ../build-arch.sh
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    export CARGO_TARGET_DIR=target
+    cargo build --release --locked
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 target/release/ipp-duplexd "$pkgdir/usr/bin/ipp-duplexd"
+    install -Dm755 target/release/ipp-duplexd-setup "$pkgdir/usr/bin/ipp-duplexd-setup"
+    install -Dm644 packaging/ipp-duplexd.service "$pkgdir/usr/lib/systemd/user/ipp-duplexd.service"
+    install -Dm644 packaging/ipp-duplexd.conf.example "$pkgdir/usr/share/doc/$pkgname/ipp-duplexd.conf.example"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
