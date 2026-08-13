@@ -4,13 +4,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# only for the closing hint; the PKGBUILD reads Cargo.toml for pkgver itself
 ver=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-tar czf "packaging/arch/ipp-duplexd-$ver.tar.gz" \
-    --transform "s,^,ipp-duplexd-$ver/," \
+
+# leftovers from when the tarball name carried the version
+rm -f packaging/arch/ipp-duplexd-*.tar.gz
+
+tar czf "packaging/arch/ipp-duplexd.tar.gz" \
+    --transform "s,^,ipp-duplexd/," \
     Cargo.toml Cargo.lock src README.md LICENSE \
     packaging/ipp-duplexd.service packaging/ipp-duplexd.conf.example
 
 cd packaging/arch
-makepkg -f "$@"
+makepkg -f -C "$@"
 echo
 echo "install with: sudo pacman -U packaging/arch/ipp-duplexd-$ver-*.pkg.tar.zst"

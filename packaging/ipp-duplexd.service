@@ -2,6 +2,10 @@
 Description=Manual duplex virtual IPP printer
 Documentation=file:/usr/share/doc/ipp-duplexd/README.md
 After=network.target
+# the flip dialog needs the session's DISPLAY/WAYLAND_DISPLAY, which the
+# desktop session imports into the user manager on its way to this target
+After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 # Put e.g.  IPP_DUPLEXD_ARGS=--printer ipp://127.0.0.1:631/printers/laser
@@ -12,4 +16,4 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target

@@ -105,6 +105,7 @@ fn main() {
     if listen != "127.0.0.1:6632" {
         daemon_args += &format!(" --listen {listen}");
     }
+    let mut gui = true;
     if confirm(
         "Change advanced options (flip dialog, rotation, blank page)?",
         false,
@@ -114,6 +115,7 @@ fn main() {
             true,
         ) {
             daemon_args += " --no-gui";
+            gui = false;
         }
         if !confirm("Rotate the even (back) pages by 180°?", true) {
             daemon_args += " --rotate-even 0";
@@ -133,7 +135,7 @@ fn main() {
     println!("Step 3: run ipp-duplexd as a service");
     let mut running = false;
     if do_service && have("systemctl") {
-        running = setup_service(&daemon_bin);
+        running = setup_service(&daemon_bin, gui);
     } else if do_service {
         println!("  systemd not found — start ipp-duplexd yourself:");
         println!("    {} {daemon_args}", daemon_bin.display());
@@ -375,17 +377,32 @@ fn write_config(daemon_args: &str) {
 // ------------------------------------------------------------------ service
 
 /// Enable + (re)start the user service; returns true if it should be running.
-fn setup_service(daemon_bin: &Path) -> bool {
+fn setup_service(daemon_bin: &Path, gui: bool) -> bool {
     // package-installed unit, or write one ourselves
     let packaged = Path::new("/usr/lib/systemd/user/ipp-duplexd.service").is_file()
         || Path::new("/lib/systemd/user/ipp-duplexd.service").is_file();
     let user_unit = home().join(".config/systemd/user/ipp-duplexd.service");
     if !packaged && !user_unit.is_file() {
+        // With the dialog, bind to the graphical session: it starts once the
+        // display variables exist and stops when they go away. Without it,
+        // there is nothing session-bound about the daemon, so run it for the
+        // whole login (it still serves GET /flip over ssh, with no desktop up).
+        let target = if gui {
+            "After=graphical-session.target\nPartOf=graphical-session.target\n"
+        } else {
+            ""
+        };
+        let wanted_by = if gui {
+            "graphical-session.target"
+        } else {
+            "default.target"
+        };
         let unit = format!(
-            "[Unit]\nDescription=Manual duplex virtual IPP printer\nAfter=network.target\n\n\
+            "[Unit]\nDescription=Manual duplex virtual IPP printer\nAfter=network.target\n\
+             {target}\n\
              [Service]\nEnvironmentFile=%h/.config/ipp-duplexd.conf\n\
              ExecStart={} $IPP_DUPLEXD_ARGS\nRestart=on-failure\nRestartSec=5\n\n\
-             [Install]\nWantedBy=default.target\n",
+             [Install]\nWantedBy={wanted_by}\n",
             daemon_bin.display()
         );
         std::fs::create_dir_all(user_unit.parent().unwrap()).ok();
@@ -398,10 +415,31 @@ fn setup_service(daemon_bin: &Path) -> bool {
         }
         let _ = run("systemctl", &["--user", "daemon-reload"]);
     }
-    // dialog needs the session's display variables in the service environment
-    for v in ["DISPLAY", "WAYLAND_DISPLAY"] {
-        if std::env::var_os(v).is_some() {
-            let _ = run("systemctl", &["--user", "import-environment", v]);
+    // The dialog needs the session's display variables in the service
+    // environment. A desktop session normally imports them into the user
+    // manager itself at login; warn if this one did not, since the dialog will
+    // not open until they are there.
+    if gui {
+        let manager_env = run("systemctl", &["--user", "show-environment"]).unwrap_or_default();
+        let missing: Vec<String> = ["DISPLAY", "WAYLAND_DISPLAY"]
+            .iter()
+            .filter(|v| {
+                !manager_env
+                    .lines()
+                    .any(|l| l.split('=').next() == Some(**v))
+            })
+            .filter_map(|v| {
+                let val = std::env::var_os(v)?;
+                Some(format!("{v}={}", val.to_string_lossy()))
+            })
+            .collect();
+        if !missing.is_empty() {
+            println!("! this desktop session does not export the display variables to systemd");
+            println!("  the flip dialog will not open until it can reach your display.");
+            println!("  put them in ~/.config/environment.d/ipp-duplexd.conf:");
+            for kv in &missing {
+                println!("      {kv}");
+            }
         }
     }
     match run("systemctl", &["--user", "enable", "--now", "ipp-duplexd"]) {
